@@ -1,0 +1,74 @@
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache and build files
+__pycache__/
+*.py[cod]
+*.so
+build/
+dist/
+*.egg-info/
+
+# Testing and coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Streamlit secrets and cache
+.streamlit/secrets.toml
+.streamlit/cache/
+
+# Datasets
+data/**/*.csv
+data/**/*.tsv
+data/**/*.parquet
+data/**/*.feather
+data/**/*.h5
+data/**/*.hdf5
+data/**/*.npy
+data/**/*.npz
+data/**/*.zip
+data/**/*.tar
+data/**/*.gz
+data/**/*.7z
+data/**/*.rar
+
+!data/info.txt
+!data/.gitkeep
+
+# Large trained models
+models/*.pkl
+models/*.pickle
+models/*.joblib
+models/*.model
+models/*.bin
+models/*.pt
+models/*.pth
+models/*.onnx
+
+!models/.gitkeep
+
+# Environment variables and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
