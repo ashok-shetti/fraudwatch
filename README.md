@@ -1,188 +1,337 @@
-# 🛡️ FraudWatch: Real-Time Fraud Risk Intelligence Engine
-> **End-to-End Machine Learning System for Large-Scale Credit Card Fraud Detection on the IEEE-CIS Dataset**
+# FraudWatch
 
-[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![XGBoost](https://img.shields.io/badge/XGBoost-v3.2.0-EB4F27?logo=xgboost&logoColor=white)](https://xgboost.readthedocs.io/)
-[![LightGBM](https://img.shields.io/badge/LightGBM-v4.6.0-2E8B57)](https://lightgbm.readthedocs.io/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+FraudWatch is a machine learning project for detecting fraudulent transactions using the IEEE-CIS Fraud Detection dataset.
 
----
+The project processes transaction and identity data, handles severe class imbalance, engineers features, compares LightGBM and XGBoost using 5-fold stratified cross-validation, and provides predictions through a Streamlit web application.
 
-## 📌 Executive Summary
+XGBoost was selected as the final model based on its validation performance.
 
-**FraudWatch** is an enterprise-grade, real-time fraud detection pipeline trained on the benchmark [IEEE-CIS Fraud Detection dataset](https://www.kaggle.com/c/ieee-fraud-detection) (590,540 transactions across 394 features). The system addresses severe class imbalance, high-cardinality categorical entities, and complex identity networks using gradient boosted decision trees (XGBoost & LightGBM).
+## Features
 
-The production model achieves an **Out-Of-Fold (OOF) ROC-AUC of 0.9694** with **90.0% precision** on fraud transactions at a 0.5 decision threshold, preventing high false-alarm rates in high-throughput transaction environments. The pipeline is packaged into a containerizable **Streamlit** dashboard supporting single-transaction risk scoring (<5 ms inference) and bulk CSV batch processing.
+- Fraud detection using transaction and identity data
+- Data preprocessing and feature engineering
+- Handling severe class imbalance with `scale_pos_weight`
+- Target encoding and frequency encoding
+- LightGBM baseline model
+- XGBoost final model
+- 5-fold stratified cross-validation
+- Out-of-fold model evaluation
+- Single transaction fraud prediction
+- Batch CSV fraud prediction
+- Adjustable decision threshold
+- CSV export of prediction results
 
----
+## Screenshots
 
-## 💼 Business Problem & Engineering Challenges
-
-| Challenge | Impact on Business | Engineering Solution |
-| :--- | :--- | :--- |
-| **Severe Class Imbalance** | Fraud represents only **3.5%** of transactions (27.58:1 ratio). Naive classifiers minimize loss by predicting majority class. | Calibrated cost-sensitive loss weighting (`scale_pos_weight = 27.58`) and 5-Fold Stratified Cross-Validation. |
-| **High-Cardinality Categoricals** | Categoricals like `P_emaildomain`, `DeviceInfo`, and card identifiers contain thousands of rare levels prone to overfitting. | **Smoothed Target Encoding** with global empirical prior ($\alpha=50$) for high-predictive variables, paired with **Frequency Encoding**. |
-| **Extreme Sparsity & High Dimensionality** | 390+ raw features with block-missing structures in V-features (engineered identity signals). | Automated missingness profiling dropping features with >90% nulls, combined with vectorized numeric constant imputation (`-999`). |
-| **Inference Latency vs. Precision** | False positives degrade customer trust; false negatives lead to direct capital loss. | Selected **XGBoost Histogram (`tree_method='hist'`)** achieving **90% precision** and **0.80 F1-score**, optimized for fast memory mapping. |
-
----
-
-## 🏗️ End-to-End Pipeline Architecture
-
-```
-[ Raw Transaction & Identity Data ] 
-                 │
-                 ▼
-┌────────────────────────────────────────────────────────┐
-│ 01. Preprocessing & Data Cleaning                     │
-│  - Merging Transaction & Identity logs                 │
-│  - Dropping columns with >90% null values (74 cols)    │
-└────────────────────────┬───────────────────────────────┘
-                         │
-                         ▼
-┌────────────────────────────────────────────────────────┐
-│ 02. Exploratory Data Analysis & Anomaly Profiling      │
-│  - Temporal distribution analysis (TransactionDT)      │
-│  - High-risk domain & card routing pattern analysis    │
-└────────────────────────┬───────────────────────────────┘
-                         │
-                         ▼
-┌────────────────────────────────────────────────────────┐
-│ 03. Feature Engineering & Artifact Serialization       │
-│  - Cyclic time feature extraction (Hour, Weekday)      │
-│  - Log-transformed monetary exposure (TransactionAmt)  │
-│  - Bayesian Smoothed Target Encoding (α=50)            │
-│  - Serialization: preprocessing_bundle.pkl             │
-└────────────────────────┬───────────────────────────────┘
-                         │
-                         ▼
-┌────────────────────────────────────────────────────────┐
-│ 04 & 05. Model Training & 5-Fold Stratified CV         │
-│  - LightGBM Baseline (OOF AUC: 0.9640)                 │
-│  - XGBoost Hist GBDT (OOF AUC: 0.9694) ──★ Champion    │
-│  - Serialization: xgb_final_model.pkl                  │
-└────────────────────────┬───────────────────────────────┘
-                         │
-                         ▼
-┌────────────────────────────────────────────────────────┐
-│ Production Deployment (Streamlit Real-Time Engine)     │
-│  - Single Transaction Risk Scoring (<5ms latency)      │
-│  - Bulk Batch CSV Scoring with dynamic thresholding    │
-└────────────────────────────────────────────────────────┘
-```
-
----
-
-## 📊 Model Evaluation & Benchmarks
-
-Models were evaluated across 5 stratified folds on the full 590,540 training records to prevent data leakage and out-of-distribution bias.
-
-### Overall Validation Performance
-
-| Metric | LightGBM Baseline | XGBoost Final (Champion) | Relative Lift |
-| :--- | :---: | :---: | :---: |
-| **OOF ROC-AUC** | `0.964013` | **`0.969376`** | **+0.0054** |
-| **Fraud Precision (Class 1)** | `0.69` (69%) | **`0.90` (90%)** | **+21.0%** |
-| **Fraud Recall (Class 1)** | **`0.75` (75%)** | `0.72` (72%) | -3.0% |
-| **Fraud F1-Score** | `0.72` | **`0.80`** | **+0.08** |
-| **Overall Accuracy** | `0.98` | **`0.99`** | **+1.0%** |
-| **Training Latency (5 Folds)** | **~7 min 03 s** | ~14 min 32 s | — |
-
-### Stratified 5-Fold Validation Breakdown
-
-| Fold | LightGBM AUC | XGBoost AUC |
+| Dashboard | Dashboard | Transaction Analysis |
 | :---: | :---: | :---: |
-| **Fold 1** | 0.962793 | **0.967716** |
-| **Fold 2** | 0.964347 | **0.968669** |
-| **Fold 3** | 0.963601 | **0.968558** |
-| **Fold 4** | 0.964751 | **0.971080** |
-| **Fold 5** | 0.965737 | **0.970959** |
-| **Mean ± Std** | `0.9640 ± 0.0010` | **`0.9694 ± 0.0014`** |
+| ![FraudWatch Dashboard](screenshots/home.png) | ![FraudWatch Dashboard](screenshots/home2.png) | ![FraudWatch Transaction Analysis](screenshots/analyze.png) |
 
-### Top Predictive Features (Feature Importance)
-- **Identity & Behavioral Anomaly Vectors**: `V258` (19.6%), `V70` (12.3%), `V294` (3.7%), `V91` (3.7%), `V201` (3.3%)
-- **Transaction & Routing Attributes**: `card1`, `card2`, `TransactionAmt_log`, `addr1`, `addr2`
-- **Categorical Risk Encodings**: `P_emaildomain_target_enc`, `ProductCD_target_enc`, `DeviceType_target_enc`
+## Dataset
 
----
+The project uses the IEEE-CIS Fraud Detection dataset.
 
-## 📁 Repository Structure
+| Dataset | Records |
+|---|---:|
+| Training transactions | 590,540 |
+| Training identity records | 144,233 |
+| Fraud transactions | 20,663 |
+| Fraud rate | 3.499% |
+
+Transaction and identity data are merged using `TransactionID`.
+
+The dataset is highly imbalanced, with approximately 27.58 legitimate transactions for every fraudulent transaction. This imbalance is handled using:
+
+```python
+scale_pos_weight = 27.58
+```
+
+## Data Processing
+
+The preprocessing pipeline includes:
+
+- Merging transaction and identity datasets using `TransactionID`
+- Dropping features with more than 80% missing values
+- Removing constant features
+- Handling missing values
+- Extracting time-based features from `TransactionDT`
+- Applying `log1p` transformation to `TransactionAmt`
+- Target encoding selected categorical features
+- Frequency encoding categorical features
+- Aligning processed data with the final model feature list
+
+The final model uses **341 processed features**.
+
+## Machine Learning Pipeline
+
+```text
+Raw Transaction Data + Identity Data
+                |
+                v
+Merge on TransactionID
+                |
+                v
+Data Cleaning
+High-Missing and Constant Feature Removal
+                |
+                v
+Feature Engineering
+Time Features + Transaction Amount Transformation
+                |
+                v
+Target Encoding + Frequency Encoding
+                |
+                v
+341 Final Features
+                |
+                v
+5-Fold Stratified Cross-Validation
+                |
+        -----------------
+        |               |
+        v               v
+    LightGBM         XGBoost
+        |               |
+        -----------------
+                |
+                v
+         XGBoost Selected
+                |
+                v
+      Full Dataset Retraining
+                |
+                v
+       Streamlit Application
+```
+
+## Models
+
+### LightGBM Baseline
+
+LightGBM was used as the baseline model and evaluated using 5-fold stratified cross-validation.
+
+| Metric | Result |
+|---|---:|
+| OOF ROC-AUC | `0.964013` |
+| Fraud Precision | `0.69` |
+| Fraud Recall | `0.75` |
+| F1-score | `0.72` |
+
+### XGBoost Final Model
+
+XGBoost was selected as the final model.
+
+The model uses:
+
+- `tree_method="hist"`
+- `scale_pos_weight=27.58`
+- 5-fold stratified cross-validation
+- Early stopping during cross-validation
+
+After cross-validation, the final model was retrained on the full training dataset using the mean best iteration count from the validation folds.
+
+## Final Model Results
+
+| Metric | XGBoost |
+|---|---:|
+| OOF ROC-AUC | `0.969376` |
+| Fraud Precision | `0.90` |
+| Fraud Recall | `0.72` |
+| F1-score | `0.80` |
+| Accuracy | `0.99` |
+
+### Fold-wise ROC-AUC
+
+| Fold | ROC-AUC |
+|---|---:|
+| Fold 1 | `0.967716` |
+| Fold 2 | `0.968669` |
+| Fold 3 | `0.968558` |
+| Fold 4 | `0.971080` |
+| Fold 5 | `0.970959` |
+| Mean ± Std | `0.9694 ± 0.0014` |
+
+## Model Comparison
+
+| Model | OOF ROC-AUC | Precision | Recall | F1-score |
+|---|---:|---:|---:|---:|
+| LightGBM | `0.964013` | `0.69` | `0.75` | `0.72` |
+| XGBoost | `0.969376` | `0.90` | `0.72` | `0.80` |
+
+XGBoost achieved the higher OOF ROC-AUC and fraud precision, so it was selected as the final model.
+
+## Feature Engineering
+
+Key feature engineering steps include:
+
+- Extracting transaction hour from `TransactionDT`
+- Extracting transaction weekday from `TransactionDT`
+- Applying `log1p` transformation to `TransactionAmt`
+- Smoothed target encoding for selected categorical features
+- Frequency encoding for categorical features
+- Filling missing numeric values with `-999`
+- Aligning incoming data with the trained model feature list
+
+For unseen categorical values during inference:
+
+- Target encoding falls back to the global fraud rate
+- Frequency encoding falls back to `0`
+
+## Streamlit Application
+
+FraudWatch includes a Streamlit application for fraud prediction.
+
+### Single Transaction Analysis
+
+Users can enter transaction information and receive a fraud probability prediction.
+
+The application supports transaction-related inputs including:
+
+- Transaction amount
+- Product code
+- Card information
+- Email domain
+- Device type
+- Billing information
+- Transaction time
+- Selected transaction features
+
+### Batch Prediction
+
+The application also supports batch fraud prediction using CSV files.
+
+Features include:
+
+- CSV upload
+- Batch fraud scoring
+- Adjustable decision threshold
+- Risk categorization
+- Exporting scored predictions to CSV
+
+## Risk Classification
+
+Predicted fraud probabilities are grouped into risk levels:
+
+- **Low Risk:** Probability below `0.20`
+- **Medium Risk:** Probability from `0.20` to the selected threshold
+- **High Risk:** Probability greater than or equal to the selected threshold
+
+The default decision threshold is `0.50`.
+
+## Project Structure
 
 ```text
 FraudWatch/
-├── data/                               # Dataset directory (raw and processed data)
-│   ├── info.txt                        # Dataset schema & description
-│   └── test_transaction.csv            # Sample test transactions for validation
-├── models/                             # Production serialized model artifacts
-│   ├── preprocessing_bundle.pkl        # Encodings, imputers, & feature metadata
-│   ├── lgbm_baseline_model.pkl         # Trained LightGBM model artifact
-│   └── xgb_final_model.pkl             # Trained Champion XGBoost model artifact
-├── notebooks/                          # Modular Jupyter experimentation workflows
-│   ├── 01_data_preprocessing.ipynb     # Data ingestion, merging, and null cleaning
-│   ├── 02_EDA.ipynb                    # Imbalance profiling, bivariate & time analysis
-│   ├── 03_feature_engineering.ipynb    # Target encoding, frequency encoding, imputations
-│   ├── 04_model_training_lightgbm.ipynb# 5-fold CV LightGBM baseline
-│   └── 05_model_training_xgboost.ipynb # 5-fold CV XGBoost with hyperparameter tuning
-├── app.py                              # Production Streamlit web application
-├── requirements.txt                    # Pinned Python package dependencies
-├── .gitignore                          # Standard git ignore rules
-└── README.md                           # Technical documentation & project guide
+├── data/
+│   ├── info.txt
+│   ├── train_transaction.csv
+│   ├── train_identity.csv
+│   ├── test_transaction.csv
+│   ├── test_identity.csv
+│   ├── train_merged_clean.csv
+│   ├── test_merged_clean.csv
+│   ├── train_final_processed.csv
+│   ├── test_final_processed.csv
+│   └── sample_submission.csv
+├── models/
+│   ├── preprocessing_bundle.pkl
+│   ├── lgbm_baseline_model.pkl
+│   └── xgb_final_model.pkl
+├── notebooks/
+│   ├── 01_data_preprocessing.ipynb
+│   ├── 02_EDA.ipynb
+│   ├── 03_feature_engineering.ipynb
+│   ├── 04_model_training_lightgbm.ipynb
+│   └── 05_model_training_xgboost.ipynb
+├── screenshots/
+│   ├── home.png
+│   ├── home2.png
+│   └── analyze.png
+├── app.py
+├── requirements.txt
+├── .gitignore
+└── README.md
 ```
 
----
+> **Note:** Large datasets and trained model files are kept locally and are not included in the GitHub repository due to file size.
 
-## 🚀 Quickstart & Local Setup
+## Installation
 
-### 1. Prerequisites
-- Python 3.10 or 3.11 installed
-- Git
+### 1. Clone the repository
 
-### 2. Clone the Repository
 ```bash
-git clone https://github.com/your-username/FraudWatch.git
-cd FraudWatch
+git clone https://github.com/ashok-shetti/fraudwatch.git
+cd fraudwatch
 ```
 
-### 3. Create and Activate Virtual Environment
+### 2. Create a virtual environment
 
-**On Windows (PowerShell):**
-```powershell
+```bash
 python -m venv venv
-.\venv\Scripts\Activate.ps1
 ```
 
-**On Linux / macOS:**
+Activate it on Windows:
+
 ```bash
-python3 -m venv venv
+venv\Scripts\activate
+```
+
+Activate it on Linux or macOS:
+
+```bash
 source venv/bin/activate
 ```
 
-### 4. Install Dependencies
+### 3. Install dependencies
+
 ```bash
-pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 5. Launch the Streamlit Dashboard
+### 4. Run the application
+
 ```bash
 streamlit run app.py
 ```
-The application will open in your browser at `http://localhost:8501`.
 
----
+The application will be available at:
 
-## 🖥️ Streamlit Application Capabilities
+```text
+http://localhost:8501
+```
 
-- **🔍 Single Transaction Scoring**:
-  - Live parameter input: Transaction Amount, Product Code, Card Issuer, Purchaser Email Domain, Device Type, and Time of Day.
-  - One-click **Quick-Fill Presets** (*Low-Risk Everyday*, *Medium-Risk New Region*, *High-Risk Anomaly*).
-  - Risk gauge visualizer with real-time confidence scores and decision recommendations.
-- **📁 Batch CSV Prediction Engine**:
-  - Drag-and-drop CSV batch upload.
-  - Built-in loader to evaluate sample records directly from `data/test_transaction.csv`.
-  - Configurable decision threshold slider to tune precision/recall trade-offs.
-  - Risk distribution analytics and one-click export of scored predictions (`fraud_predictions.csv`).
----
-- **Domain**: Machine Learning / Financial Risk Intelligence / Fraud Analytics
-- **Technologies**: Python, XGBoost, LightGBM, Scikit-Learn, Pandas, NumPy, Streamlit
+## Tech Stack
+
+### Programming
+
+- Python
+
+### Machine Learning
+
+- XGBoost
+- LightGBM
+- Scikit-learn
+
+### Data Processing
+
+- Pandas
+- NumPy
+- SciPy
+
+### Visualization
+
+- Matplotlib
+- Seaborn
+
+### Application
+
+- Streamlit
+
+## Limitations
+
+- The project uses the IEEE-CIS benchmark dataset and may not represent every real-world fraud environment.
+- The application does not include real-time streaming systems.
+- FastAPI, Docker, Kubernetes, and distributed microservices are not part of the confirmed implementation.
+- Automated model monitoring and drift detection are not included.
+- Unseen categorical values fall back to predefined encoding defaults.
+- The Streamlit application is designed as a project dashboard rather than a high-concurrency API service.
