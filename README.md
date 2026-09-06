@@ -301,37 +301,19 @@ http://localhost:8501
 ```
 
 ## Tech Stack
-
-### Programming
-
-- Python
-
-### Machine Learning
-
-- XGBoost
-- LightGBM
-- Scikit-learn
-
-### Data Processing
-
-- Pandas
-- NumPy
-- SciPy
-
-### Visualization
-
-- Matplotlib
-- Seaborn
-
-### Application
-
-- Streamlit
+| Area | Technologies |
+|---|---|
+| Programming | Python |
+| Machine Learning | XGBoost, LightGBM, Scikit-learn |
+| Data Processing | Pandas, NumPy, SciPy |
+| Visualization | Matplotlib, Seaborn |
+| Application | Streamlit |
 
 ## Limitations
 
 - The project uses the IEEE-CIS benchmark dataset and may not represent every real-world fraud environment.
 - The application does not include real-time streaming systems.
-- FastAPI, Docker, Kubernetes, and distributed microservices are not part of the confirmed implementation.
+- Architecture is optimized for local demonstration via Streamlit rather than containerized microservice deployment (Docker/FastAPI).
 - Automated model monitoring and drift detection are not included.
 - Unseen categorical values fall back to predefined encoding defaults.
 - The Streamlit application is designed as a project dashboard rather than a high-concurrency API service.
